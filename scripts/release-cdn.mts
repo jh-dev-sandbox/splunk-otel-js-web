@@ -83,10 +83,9 @@ for (const asset of assets) {
 		continue
 	}
 
-	const filename = path.join(ARTIFACTS_DIR, asset)
-	console.log(`\t- ${filename}`)
+	console.log(`\t- ${asset}`)
 
-	const assetBuffer = await fs.readFile(filename)
+	const assetBuffer = await fs.readFile(path.join(ARTIFACTS_DIR, asset))
 	console.log('\t\t- fetched')
 
 	const sha384Sum = crypto.createHash('sha384').update(assetBuffer).digest('base64')
@@ -96,11 +95,12 @@ for (const asset of assets) {
 	for (const version of versions) {
 		console.log(`\t\t\t- version: ${version.name}`)
 
-		const key = `o11y-gdi-rum/${version.name}/${filename}`
+		const key = `o11y-gdi-rum/${version.name}/${asset}`
 		console.log(`\t\t\t\t- key: ${key}`)
 
 		const publicUrl = `https://cdn.signalfx.com/${key}`
-		const contentType = getMimeType(filename)
+		const contentType = getMimeType(asset)
+		console.log({ key })
 		if (!isDryRun) {
 			await uploadToS3(key, CDN_BUCKET_NAME, assetBuffer, { contentType })
 			console.log(`\t\t\t\t- uploaded as ${publicUrl}`)
@@ -114,7 +114,7 @@ for (const asset of assets) {
 			cdnLinksByVersion[version.name].push(
 				generateScriptSnippet({
 					isVersionImmutable: version.isVersionImmutable,
-					filename,
+					filename: asset,
 					integrityValue,
 					publicUrl,
 				}),
@@ -147,3 +147,5 @@ if (targetVersion !== 'main') {
 		console.log('------')
 	}
 }
+
+console.log({ assets, versions })
