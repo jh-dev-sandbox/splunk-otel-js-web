@@ -143,4 +143,4 @@ release_cdn:
         - npm ci --include=dev
         # authenticate and release to CDN
         # - creds-helper init && eval $(creds-helper aws --eval aws:v1/o11y-infra/role/o11y_gdi_otel_js_web_releaser_role)
-        - npx tsx scripts/release-cdn.mts v${CI_COMMIT_REF_NAME:1} --dry-run
+        - npx tsx scripts/release-cdn.mts ${CI_COMMIT_REF_NAME} --dry-run
