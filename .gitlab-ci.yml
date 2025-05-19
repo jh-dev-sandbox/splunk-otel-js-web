@@ -90,7 +90,7 @@ release_npm:
     script:
         # release to NPM
         - npm run tag:check
-        - echo "//npm.pkg.github.com:_authToken=$NPM_TOKEN" > ~/.npmrc
+        - echo "//npm.pkg.github.com:_authToken=$NPM_TOKEN\n@splunk:registry=https://npm.pkg.github.com" > ~/.npmrc
         - for f in artifacts/*.tgz; do npm publish ./$f; done;
         - rm -f ~/.npmrc
 
