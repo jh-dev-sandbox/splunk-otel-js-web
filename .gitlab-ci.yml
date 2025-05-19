@@ -110,8 +110,13 @@ release_github:
             - artifacts/
     stage: release
     only:
-        - /^v\d+\.\d+\.\d+(-[a-zA-Z]+\.\d)?$/
+        - /^(v\d+\.\d+\.\d+(-[a-zA-Z]+\.\d)?|main)$/
     script:
+        - |
+            if [[ "$CI_COMMIT_REF_NAME" == "main" ]]; then
+              echo "Skipping release step for 'main' branch."
+              exit 0
+            fi
         - sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key 23F3D4EA75716059
         - echo "deb [arch=$(dpkg --print-architecture)] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
         - sudo apt update
@@ -130,9 +135,7 @@ release_cdn:
     stage: release
     only:
         - /^(v\d+\.\d+\.\d+(-[a-zA-Z]+\.\d)?|main)$/
-    needs:
-        - job: release_github
-          optional: true
+    needs: ['release_github']
     id_tokens:
         CI_JOB_JWT:
             aud: $CICD_VAULT_ADDR
