@@ -48,7 +48,7 @@ export const getReleaseForTag = async (owner: string, repo: string, tagName: str
 	const release = data.find((r) => r.tag_name === tagName)
 
 	if (!release) {
-		throw new Error(`Release not found for tag ${process.env.GITHUB_TAG_NAME}`)
+		throw new Error(`Release not found for tag ${tagName}`)
 	}
 
 	const baseVersion = release.tag_name
