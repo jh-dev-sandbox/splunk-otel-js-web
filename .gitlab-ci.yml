@@ -56,7 +56,7 @@ build:
 build_artifacts:
     stage: build
     only:
-        - /^v[0-9]+\..*/
+        - /^v\d+\.\d+\.\d+(-[a-zA-Z]+\.1)?$/
     artifacts:
         paths:
             - artifacts/
@@ -86,12 +86,22 @@ release_npm:
             - artifacts/
     stage: release
     only:
-        - /^v[0-9]+\..*/
+        - /^v\d+\.\d+\.\d+(-[a-zA-Z]+\.\d)?$/
     script:
-        # release to NPM
-        - npm run tag:check
         - echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
-        - for f in artifacts/*.tgz; do npm publish --dry-run ./$f; done;
+        - |
+            tag_flag=""
+            if [[ "$CI_COMMIT_TAG" =~ -([a-zA-Z]+)\.\d$ ]]; then
+              tag_name="${BASH_REMATCH[1]}"
+              tag_flag="--tag $tag_name"
+              echo "Publishing with tag: $tag_name"
+            else
+              echo "No tag suffix found, publishing without tag"
+            fi
+
+            for f in artifacts/*.tgz; do
+              npm publish --dry-run $tag_flag "./$f"
+            done
         - rm -f ~/.npmrc
 
 release_github:
@@ -100,7 +110,7 @@ release_github:
             - artifacts/
     stage: release
     only:
-        - /^v[0-9]+\..*/
+        - /^v\d+\.\d+\.\d+(-[a-zA-Z]+\.\d)?$/
     script:
         - sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key 23F3D4EA75716059
         - echo "deb [arch=$(dpkg --print-architecture)] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
