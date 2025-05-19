@@ -130,7 +130,9 @@ release_cdn:
     stage: release
     only:
         - /^(v\d+\.\d+\.\d+(-[a-zA-Z]+\.\d)?|main)$/
-    needs: ['release_github']
+    needs:
+        - job: release_github
+          optional: true
     id_tokens:
         CI_JOB_JWT:
             aud: $CICD_VAULT_ADDR
