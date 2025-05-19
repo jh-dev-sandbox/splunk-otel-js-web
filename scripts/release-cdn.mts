@@ -30,6 +30,7 @@ import {
 	patchGithubReleaseBody,
 	uploadToS3,
 	getReleaseForTag,
+	getAllVersions,
 } from './utils/index.mjs'
 
 const CDN_LISTED_FILES = ['splunk-otel-web.js', 'splunk-otel-web-session-recorder.js']
@@ -72,14 +73,16 @@ const cdnLinksByVersion: Record<string, string[]> = {}
 // Avoid accidental assets upload
 const allowedExtensions = ['.tgz', '.js', '.js.map', '.txt']
 const assets = await fs.readdir(ARTIFACTS_DIR)
-const versions = Array.from(generateAllVersions(targetVersion))
-versions.forEach(([version]) => {
-	cdnLinksByVersion[version] = []
+const versions = getAllVersions(targetVersion)
+
+versions.forEach((version) => {
+	cdnLinksByVersion[version.name] = []
 })
 
 for (const asset of assets) {
+	// Check if file ends with one of the allowed extensions
 	if (!allowedExtensions.some((ext) => asset.endsWith(ext))) {
-		continue
+		continue // skip files with other extensions
 	}
 
 	const filename = path.join(ARTIFACTS_DIR, asset)
@@ -92,10 +95,10 @@ for (const asset of assets) {
 	const integrityValue = `sha384-${sha384Sum}`
 	console.log(`\t\t- calculated integrity ${integrityValue}`)
 
-	for (const [version, isAutoUpdating] of versions) {
-		console.log(`\t\t\t- version: ${version}`)
+	for (const version of versions) {
+		console.log(`\t\t\t- version: ${version.name}`)
 
-		const key = `o11y-gdi-rum/${version}/${filename}`
+		const key = `o11y-gdi-rum/${version.name}/${filename}`
 		console.log(`\t\t\t\t- key: ${key}`)
 
 		const publicUrl = `https://cdn.signalfx.com/${key}`
@@ -110,8 +113,13 @@ for (const asset of assets) {
 		if (CDN_LISTED_FILES.includes(asset)) {
 			console.log('\t\t\t\t- generating script snippet')
 
-			cdnLinksByVersion[version].push(
-				generateScriptSnippet({ isVersionMutable: !isAutoUpdating, filename, integrityValue, publicUrl }),
+			cdnLinksByVersion[version.name].push(
+				generateScriptSnippet({
+					isVersionImmutable: version.isVersionImmutable,
+					filename,
+					integrityValue,
+					publicUrl,
+				}),
 			)
 		}
 	}
@@ -139,37 +147,5 @@ if (targetVersion !== 'main') {
 		console.log('------')
 		console.log(cdnLinks.join('\n'))
 		console.log('------')
-	}
-}
-
-function* generateAllVersions(version: string): Generator<[string, boolean], void, unknown> {
-	if (version === 'main') {
-		yield ['next', true]
-		return
-	}
-
-	const versionParts = version.split('.')
-
-	let isAutoUpdating = false,
-		isPreRelease = false
-
-	while (versionParts.length) {
-		yield [`${versionParts.join('.')}`, isAutoUpdating]
-		const lastSegment = versionParts.pop()
-
-		if (lastSegment === undefined) {
-			throw TypeError('lastSegment is undefined')
-		}
-
-		if (lastSegment.search(/[\D-]/) > -1 && versionParts.length > 0) {
-			isPreRelease = true
-			break
-		}
-
-		isAutoUpdating = true
-	}
-
-	if (!isPreRelease) {
-		yield ['latest', true]
 	}
 }

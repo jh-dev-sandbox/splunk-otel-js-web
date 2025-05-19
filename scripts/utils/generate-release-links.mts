@@ -15,24 +15,27 @@
  * limitations under the License.
  *
  */
-export const generateCDNLinks = (versions: [string, boolean][], cdnLinksByVersion: Record<string, string[]>) => [
+
+import { Version } from './versions.mjs'
+
+export const generateCDNLinks = (versions: Version[], cdnLinksByVersion: Record<string, string[]>) => [
 	'\n## CDN',
-	...versions.map(([version, isAutoUpdating]) => {
-		if (cdnLinksByVersion[version].length === 0) {
+	...versions.map(({ name, isVersionImmutable }) => {
+		if (cdnLinksByVersion[name].length === 0) {
 			return ''
 		}
 
 		const lines = []
 		let footer = ''
 
-		if (!isAutoUpdating || version === 'latest') {
-			lines.push(`### Version ${version}`, '')
+		if (!isVersionImmutable || name === 'latest') {
+			lines.push(`### Version ${name}`, '')
 		} else {
-			lines.push(`<details><summary>Version ${version}</summary>`, '')
+			lines.push(`<details><summary>Version ${name}</summary>`, '')
 			footer = '</details>\n'
 		}
 
-		if (isAutoUpdating) {
+		if (!isVersionImmutable) {
 			lines.push(
 				'**WARNING: Content behind this URL might be updated when we release a new version.**',
 				'For this reason we do not provide `integrity` attribute.',
@@ -40,7 +43,7 @@ export const generateCDNLinks = (versions: [string, boolean][], cdnLinksByVersio
 			)
 		}
 
-		lines.push('```html', ...cdnLinksByVersion[version], '```\n', footer)
+		lines.push('```html', ...cdnLinksByVersion[name], '```\n', footer)
 
 		return lines.join('\n')
 	}),
