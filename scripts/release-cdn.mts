@@ -19,7 +19,6 @@
 import crypto from 'crypto'
 import * as fs from 'fs/promises'
 import * as path from 'path'
-import mime from 'mime-types'
 import dotenv from 'dotenv'
 
 import {
@@ -31,6 +30,7 @@ import {
 	uploadToS3,
 	getReleaseForTag,
 	getAllVersions,
+	getMimeType,
 } from './utils/index.mjs'
 
 const CDN_LISTED_FILES = ['splunk-otel-web.js', 'splunk-otel-web-session-recorder.js']
@@ -74,15 +74,13 @@ const cdnLinksByVersion: Record<string, string[]> = {}
 const allowedExtensions = ['.tgz', '.js', '.js.map', '.txt']
 const assets = await fs.readdir(ARTIFACTS_DIR)
 const versions = getAllVersions(targetVersion)
-
 versions.forEach((version) => {
 	cdnLinksByVersion[version.name] = []
 })
 
 for (const asset of assets) {
-	// Check if file ends with one of the allowed extensions
 	if (!allowedExtensions.some((ext) => asset.endsWith(ext))) {
-		continue // skip files with other extensions
+		continue
 	}
 
 	const filename = path.join(ARTIFACTS_DIR, asset)
@@ -102,7 +100,7 @@ for (const asset of assets) {
 		console.log(`\t\t\t\t- key: ${key}`)
 
 		const publicUrl = `https://cdn.signalfx.com/${key}`
-		const contentType = mime.lookup(filename) || 'application/octet-stream'
+		const contentType = getMimeType(filename)
 		if (!isDryRun) {
 			await uploadToS3(key, CDN_BUCKET_NAME, assetBuffer, { contentType })
 			console.log(`\t\t\t\t- uploaded as ${publicUrl}`)
