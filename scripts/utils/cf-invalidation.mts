@@ -17,7 +17,7 @@
  */
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront'
 
-const cfClient = new CloudFrontClient({ region: 'us-east-1' })
+const cfClient = new CloudFrontClient({ region: process.env.AWS_REGION ?? 'us-east-1' })
 
 export const invalidateCloudFrontFiles = async (distributionId: string, invalidationRef: string) => {
 	const { Invalidation } = await cfClient.send(

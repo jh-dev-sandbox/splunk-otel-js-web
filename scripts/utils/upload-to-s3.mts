@@ -17,7 +17,7 @@
  */
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 
-const s3Client = new S3Client({ region: 'us-east-1' })
+const s3Client = new S3Client({ region: process.env.AWS_REGION ?? 'us-east-1' })
 
 export const uploadToS3 = (
 	key: string,
