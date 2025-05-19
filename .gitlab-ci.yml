@@ -89,16 +89,9 @@ release_npm:
         - /^v[0-9]+\..*/
     script:
         # release to NPM
-        - echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
-        - |
-            if [ -z "$NPM_TOKEN" ]; then
-              echo "Error: NPM_TOKEN is not set"
-            fi
-        - |
-            for f in artifacts/*.tgz; do
-              echo "Previewing contents of $f"
-              tar -tzf "$f"
-            done
+        - npm run tag:check
+        - echo "//npm.pkg.github.com:_authToken=$NPM_TOKEN" > ~/.npmrc
+        - for f in artifacts/*.tgz; do npm publish ./$f; done;
         - rm -f ~/.npmrc
 
 release_github:
