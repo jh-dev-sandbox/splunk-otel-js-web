@@ -132,7 +132,8 @@ if (!isDryRun) {
 	console.log(`Invalidation ${Invalidation?.Id} sent. Typically it takes about 5 minutes to execute.`)
 }
 
-if (targetVersion !== 'main') {
+const semverRegex = /^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$/
+if (semverRegex.test(targetVersion)) {
 	const ghRelease = await getReleaseForTag(OWNER, REPO, targetVersion)
 	console.log(`I have found the latest version to be: ${ghRelease.tag_name} named "${ghRelease.name}."`)
 
