@@ -28,7 +28,7 @@ export const generateCDNLinks = (versions: Version[], cdnLinksByVersion: Record<
 		const lines = []
 		let footer = ''
 
-		if (!isVersionImmutable || name === 'latest') {
+		if (isVersionImmutable || name === 'latest') {
 			lines.push(`### Version ${name}`, '')
 		} else {
 			lines.push(`<details><summary>Version ${name}</summary>`, '')
