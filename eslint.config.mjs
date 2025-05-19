@@ -268,6 +268,7 @@ export default [
 			'vitest-report',
 			'**/html/',
 			'**/playwright-report/',
+			'**/artifacts/',
 		],
 	},
 ]

@@ -16,20 +16,20 @@
  *
  */
 export const generateScriptSnippet = ({
-	isVersionMutable,
+	isVersionImmutable,
 	filename,
 	publicUrl,
 	integrityValue,
 }: {
 	filename: string
 	integrityValue: string
-	isVersionMutable: boolean
+	isVersionImmutable: boolean
 	publicUrl: string
 }) => {
 	const lines = []
 
 	lines.push(`${filename}:`)
-	if (!isVersionMutable) {
+	if (!isVersionImmutable) {
 		lines.push(`<script src="${publicUrl}" crossorigin="anonymous"></script>`)
 	} else {
 		lines.push(`<script src="${publicUrl}" integrity="${integrityValue}" crossorigin="anonymous"></script>`)
