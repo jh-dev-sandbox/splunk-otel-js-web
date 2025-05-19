@@ -22,7 +22,7 @@ export interface Version {
 
 function* generateAllVersions(version: string): Generator<Version, void, unknown> {
 	if (version === 'main') {
-		yield { name: version, isVersionImmutable: false }
+		yield { name: 'next', isVersionImmutable: false }
 		return
 	}
 
