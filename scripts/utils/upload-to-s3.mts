@@ -30,7 +30,7 @@ export const uploadToS3 = (
 			Body: buffer,
 			Bucket: bucketName,
 			Key: `cdn/${key}`,
-			ACL: 'public-read',
+			// ACL: 'public-read',
 			ContentType: contentType,
 			CacheControl: 'max-age=3600',
 		}),
