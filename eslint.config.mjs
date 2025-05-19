@@ -87,7 +87,7 @@ export default [
 				{
 					default: {
 						memberTypes: [
-							// Index signature
+							// Index signature,
 							'signature',
 
 							// Fields
