@@ -90,8 +90,8 @@ release_npm:
     script:
         # release to NPM
         - npm run tag:check
-        - echo "//npm.pkg.github.com:_authToken=$NPM_TOKEN\n@splunk:registry=https://npm.pkg.github.com" > ~/.npmrc
-        - for f in artifacts/*.tgz; do npm publish ./$f; done;
+        - echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
+        - for f in artifacts/*.tgz; do npm publish --dry-run ./$f; done;
         - rm -f ~/.npmrc
 
 release_github:
@@ -125,6 +125,7 @@ release_cdn:
         CI_JOB_JWT:
             aud: $CICD_VAULT_ADDR
     script:
+        - npm ci --include=dev
         # authenticate and release to CDN
         # - creds-helper init && eval $(creds-helper aws --eval aws:v1/o11y-infra/role/o11y_gdi_otel_js_web_releaser_role)
         - tsx scripts/release-cdn.mts v${CI_COMMIT_REF_NAME:1} --dry-run
