@@ -31,8 +31,8 @@ import {
 	uploadToS3,
 } from './utils/index.mjs'
 
-const OWNER = 'signalfx'
-const REPO = 'splunk-otel-js-web'
+const OWNER = process.env.GITHUB_OWNER ?? 'signalfx'
+const REPO = process.env.GITHUB_REPO ?? 'splunk-otel-js-web'
 const CDN_LISTED_FILES = ['splunk-otel-web.js', 'splunk-otel-web-session-recorder.js']
 
 const isDryRun = process.argv.some((arg) => arg === '--dry-run')
