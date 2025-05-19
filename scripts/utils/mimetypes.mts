@@ -15,12 +15,19 @@
  * limitations under the License.
  *
  */
-export * from './get-package-roots.mjs'
-export * from './github.mjs'
-export * from './arguments.mjs'
-export * from './cf-invalidation.mjs'
-export * from './generate-script-snippet.mjs'
-export * from './generate-release-links.mjs'
-export * from './upload-to-s3.mjs'
-export * from './versions.mjs'
-export * from './mimetypes.mjs'
+
+const mimetypes: Record<string, string> = {
+	'.tgz': 'application/x-gtar',
+	'.js': 'application/javascript',
+	'.js.map': 'application/octet-stream',
+	'.txt': 'text/plain',
+}
+
+export const getMimeType = (filename: string) => {
+	for (const ext of Object.keys(mimetypes)) {
+		if (filename.endsWith(ext)) {
+			return mimetypes[ext]
+		}
+	}
+	return 'application/octet-stream'
+}
