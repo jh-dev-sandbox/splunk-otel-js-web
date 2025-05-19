@@ -106,7 +106,12 @@ release_github:
         - echo "deb [arch=$(dpkg --print-architecture)] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
         - sudo apt update
         - sudo apt install gh
-        - gh release create v${CI_COMMIT_REF_NAME:1} ./artifacts/* --target $CI_COMMIT_SHA --repo $GITHUB_REPOSITORY
+        - |
+            prerelease_flag=""
+            if [[ "$CI_COMMIT_REF_NAME" == *"-beta"* ]]; then
+              prerelease_flag="--prerelease"
+            fi
+            gh release create v${CI_COMMIT_REF_NAME:1} ./artifacts/* --target $CI_COMMIT_SHA --repo $GITHUB_REPOSITORY $prerelease_flag
 
 release_cdn:
     artifacts:
