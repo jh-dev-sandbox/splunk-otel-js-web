@@ -17,23 +17,25 @@
  */
 
 import crypto from 'crypto'
-
+import * as fs from 'fs/promises'
+import * as path from 'path'
+import mime from 'mime-types'
 import dotenv from 'dotenv'
-import fetch from 'node-fetch'
+
 import {
 	generateCDNLinks,
 	generateScriptSnippet,
-	getAssetsForRelease,
 	getPositionalArguments,
-	getReleaseForTag,
 	invalidateCloudFrontFiles,
 	patchGithubReleaseBody,
 	uploadToS3,
+	getReleaseForTag,
 } from './utils/index.mjs'
 
+const CDN_LISTED_FILES = ['splunk-otel-web.js', 'splunk-otel-web-session-recorder.js']
+const ARTIFACTS_DIR = './artifacts'
 const OWNER = process.env.GITHUB_OWNER ?? 'signalfx'
 const REPO = process.env.GITHUB_REPO ?? 'splunk-otel-js-web'
-const CDN_LISTED_FILES = ['splunk-otel-web.js', 'splunk-otel-web-session-recorder.js']
 
 const isDryRun = process.argv.some((arg) => arg === '--dry-run')
 if (isDryRun) {
@@ -64,29 +66,26 @@ if (!process.env.GITHUB_TOKEN && !isDryRun) {
 	throw new Error('You are missing an environment variable GITHUB_TOKEN.')
 }
 
-const ghRelease = await getReleaseForTag(OWNER, REPO, targetVersion)
-console.log(`I have found the latest version to be: ${ghRelease.tag_name} named "${ghRelease.name}."`)
-
-const assets = await getAssetsForRelease(OWNER, REPO, ghRelease.id)
-console.log(`This release has ${assets.length} release artifacts: ${assets.map(({ name }) => name).join(', ')}.`)
-
-const versions = Array.from(generateAllVersions(ghRelease.tag_name))
-console.log(`This release will update following versions in CDN: ${versions.map(([version]) => version).join(', ')}`)
-
 console.log('I will now process the files:')
 const cdnLinksByVersion: Record<string, string[]> = {}
 
+// Avoid accidental assets upload
+const allowedExtensions = ['.tgz', '.js', '.js.map', '.txt']
+const assets = await fs.readdir(ARTIFACTS_DIR)
+const versions = Array.from(generateAllVersions(targetVersion))
 versions.forEach(([version]) => {
 	cdnLinksByVersion[version] = []
 })
 
 for (const asset of assets) {
-	const filename = asset.name
-	console.log(`\t- ${filename}`)
-	console.log(`\t\t- fetching from ${asset.browser_download_url}.`)
+	if (!allowedExtensions.some((ext) => asset.endsWith(ext))) {
+		continue
+	}
 
-	const response = await fetch(asset.browser_download_url)
-	const assetBuffer = await response.buffer()
+	const filename = path.join(ARTIFACTS_DIR, asset)
+	console.log(`\t- ${filename}`)
+
+	const assetBuffer = await fs.readFile(filename)
 	console.log('\t\t- fetched')
 
 	const sha384Sum = crypto.createHash('sha384').update(assetBuffer).digest('base64')
@@ -100,14 +99,15 @@ for (const asset of assets) {
 		console.log(`\t\t\t\t- key: ${key}`)
 
 		const publicUrl = `https://cdn.signalfx.com/${key}`
+		const contentType = mime.lookup(filename) || 'application/octet-stream'
 		if (!isDryRun) {
-			await uploadToS3(key, CDN_BUCKET_NAME, assetBuffer, { contentType: asset.content_type })
+			await uploadToS3(key, CDN_BUCKET_NAME, assetBuffer, { contentType })
 			console.log(`\t\t\t\t- uploaded as ${publicUrl}`)
 		} else {
-			console.log(`\t\t\t\t- would be uploaded as ${publicUrl}`)
+			console.log(`\t\t\t\t- would be uploaded as ${publicUrl} ${contentType}`)
 		}
 
-		if (CDN_LISTED_FILES.includes(asset.name)) {
+		if (CDN_LISTED_FILES.includes(asset)) {
 			console.log('\t\t\t\t- generating script snippet')
 
 			cdnLinksByVersion[version].push(
@@ -119,25 +119,35 @@ for (const asset of assets) {
 
 const cdnLinks = generateCDNLinks(versions, cdnLinksByVersion)
 
-if (isDryRun) {
-	console.log('Following would be added to the release notes:')
-	console.log('------')
-	console.log(cdnLinks.join('\n'))
-	console.log('------')
-}
-
 if (!isDryRun) {
 	console.log('Creating an invalidation to refresh shared versions.')
 	const invalidationRef = `o11y-gdi-rum-${new Date().toISOString()}`
 	const Invalidation = await invalidateCloudFrontFiles(CDN_DISTRIBUTION_ID, invalidationRef)
 	console.log(`Invalidation ${Invalidation?.Id} sent. Typically it takes about 5 minutes to execute.`)
+}
+
+if (targetVersion !== 'main') {
+	const ghRelease = await getReleaseForTag(OWNER, REPO, targetVersion)
+	console.log(`I have found the latest version to be: ${ghRelease.tag_name} named "${ghRelease.name}."`)
 
 	console.log('Appending CDN instructions to release description.')
-	await patchGithubReleaseBody(ghRelease, ghRelease.body + cdnLinks.join('\n'))
-	console.log(`Please verify that instructions are correct by navigating to: ${ghRelease.html_url}`)
+	if (!isDryRun) {
+		await patchGithubReleaseBody(ghRelease, ghRelease.body + cdnLinks.join('\n'))
+		console.log(`Please verify that instructions are correct by navigating to: ${ghRelease.html_url}`)
+	} else {
+		console.log('Following would be added to the release notes:')
+		console.log('------')
+		console.log(cdnLinks.join('\n'))
+		console.log('------')
+	}
 }
 
 function* generateAllVersions(version: string): Generator<[string, boolean], void, unknown> {
+	if (version === 'main') {
+		yield ['next', true]
+		return
+	}
+
 	const versionParts = version.split('.')
 
 	let isAutoUpdating = false,

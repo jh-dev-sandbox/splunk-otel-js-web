@@ -59,15 +59,6 @@ export const getReleaseForTag = async (owner: string, repo: string, tagName: str
 	return release
 }
 
-export const getAssetsForRelease = async (owner: string, repo: string, releaseId: number) => {
-	const { data } = (await requestWithAuth(`GET /repos/${owner}/${repo}/releases/${releaseId}/assets`)) as {
-		data: { browser_download_url: string; content_type: string; name: string }[]
-		status: number
-	}
-
-	return data
-}
-
 export const patchGithubReleaseBody = async (ghRelease: GithubRelease, body: string) => {
 	await requestWithAuth(`PATCH ${ghRelease.url}`, {
 		body,
