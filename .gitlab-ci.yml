@@ -129,7 +129,7 @@ release_cdn:
             - artifacts/
     stage: release
     only:
-        - /^v[0-9]+\..*/
+        - /^(v\d+\.\d+\.\d+(-[a-zA-Z]+\.\d)?|main)$/
     needs: ['release_github']
     id_tokens:
         CI_JOB_JWT:
