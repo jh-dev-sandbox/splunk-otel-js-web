@@ -24,7 +24,8 @@ const mimetypes: Record<string, string> = {
 }
 
 export const getMimeType = (filename: string) => {
-	for (const ext of Object.keys(mimetypes)) {
+	const sortedExtensions = Object.keys(mimetypes).sort((a, b) => b.length - a.length)
+	for (const ext of sortedExtensions) {
 		if (filename.endsWith(ext)) {
 			return mimetypes[ext]
 		}

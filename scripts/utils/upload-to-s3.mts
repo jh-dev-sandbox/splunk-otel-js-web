@@ -22,7 +22,7 @@ const s3Client = new S3Client({ region: process.env.AWS_REGION ?? 'us-east-1' })
 export const uploadToS3 = (
 	key: string,
 	bucketName: string,
-	buffer: Buffer<ArrayBufferLike>,
+	buffer: Uint8Array,
 	{ contentType }: { contentType: string },
 ) =>
 	s3Client.send(
