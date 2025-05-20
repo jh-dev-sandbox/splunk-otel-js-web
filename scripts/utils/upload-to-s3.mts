@@ -19,12 +19,19 @@ import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 
 const s3Client = new S3Client({ region: process.env.AWS_REGION ?? 'us-east-1' })
 
-export const uploadToS3 = (
-	key: string,
-	bucketName: string,
-	buffer: Uint8Array,
-	{ contentType }: { contentType: string },
-) =>
+export const uploadToS3 = ({
+	contentType,
+	key,
+	bucketName,
+	buffer,
+	isImmutable,
+}: {
+	bucketName: string
+	buffer: Uint8Array
+	contentType: string
+	isImmutable: boolean
+	key: string
+}) =>
 	s3Client.send(
 		new PutObjectCommand({
 			Body: buffer,
@@ -32,6 +39,6 @@ export const uploadToS3 = (
 			Key: `cdn/${key}`,
 			ACL: 'public-read',
 			ContentType: contentType,
-			CacheControl: 'max-age=3600',
+			CacheControl: isImmutable ? 'public, max-age=31536000, immutable' : 'max-age=3600',
 		}),
 	)

@@ -102,7 +102,13 @@ for (const asset of assets) {
 		const contentType = getMimeType(asset)
 
 		if (!isDryRun) {
-			await uploadToS3(key, CDN_BUCKET_NAME, assetBuffer, { contentType })
+			await uploadToS3({
+				key,
+				bucketName: CDN_BUCKET_NAME,
+				buffer: assetBuffer,
+				contentType,
+				isImmutable: version.isVersionImmutable,
+			})
 			console.log(`\t\t\t\t- uploaded as ${publicUrl}`)
 		} else {
 			console.log(`\t\t\t\t- would be uploaded as ${publicUrl} ${contentType}`)
