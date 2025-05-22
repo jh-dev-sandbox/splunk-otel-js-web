@@ -154,5 +154,3 @@ if (semverRegex.test(targetVersion)) {
 		console.log('------')
 	}
 }
-
-console.log({ assets, versions })
