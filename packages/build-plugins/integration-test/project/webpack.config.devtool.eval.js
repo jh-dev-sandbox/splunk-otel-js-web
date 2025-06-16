@@ -15,7 +15,7 @@
  * limitations under the License.
  *
  */
-const { SplunkRumWebpackPlugin } = require('@splunk/otel-web-build-plugins')
+const { SplunkRumWebpackPlugin } = require('@splunk/rum-build-plugins')
 const { getBaseConfig } = require('./webpack-utils')
 
 module.exports = {
