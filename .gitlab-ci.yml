@@ -12,7 +12,8 @@ cache:
             - pnpm-workspace.yaml
     paths:
         - './node_modules'
-        - './packages/**/node_modules'
+        - './packages/*/node_modules'
+        - './packages/build-plugins/integration-test/node_modules'
 
 .default-setup: &pnpm-setup
     before_script:
