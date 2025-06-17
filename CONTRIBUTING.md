@@ -147,7 +147,7 @@ pnpm run test
 
 ## Licensing
 
-See the [LICENSE](LICENSE) file for our repository's licensing. We will ask you to
+See the [LICENSE](./LICENSE) file for our repository's licensing. We will ask you to
 confirm the licensing of your contribution.
 
 ### Contributor License Agreement
