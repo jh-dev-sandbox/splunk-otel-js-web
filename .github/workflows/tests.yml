@@ -39,7 +39,7 @@ jobs:
               # Firefox tests are flaky.
               # Remove once this issue is resolved: https://github.com/vitest-dev/vitest/issues/7377
               continue-on-error: ${{ matrix.browser == 'firefox' }}
-              run: pnpm run test:unit -- --browser.name=${{ matrix.browser }}
+              run: pnpm run test:unit --browser.name=${{ matrix.browser }}
 
             - name: Upload test:unit report
               uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -84,7 +84,7 @@ jobs:
                   retention-days: 1
 
             - name: Run Unit Tests
-              run: pnpm run test:unit -- --browser.name=${{ matrix.browser }}
+              run: pnpm run test:unit --browser.name=${{ matrix.browser }}
 
             - name: Upload test:unit report
               uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

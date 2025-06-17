@@ -24,7 +24,7 @@ stages:
     - test
     - release
 
-npm_install:
+pnpm_install:
     <<: *pnpm-setup
     stage: setup
     script:
@@ -84,7 +84,7 @@ unit_test:
         - pnpm install --frozen-lockfile
         - pnpm exec playwright install --with-deps
         - pnpm run compile
-        - pnpm run test:unit -- --browser.name chromium
+        - pnpm run test:unit --browser.name chromium
         - pnpm run test:plugin
 
 oss-scan:
@@ -112,7 +112,7 @@ release_npm:
             fi
 
             for f in artifacts/*.tgz; do
-              pnpm publish --dru-run $tag_flag "./$f"
+              pnpm publish --dry-run $tag_flag "./$f"
             done
         - rm -f ~/.npmrc
 
@@ -155,5 +155,5 @@ release_cdn:
     script:
         - pnpm install --frozen-lockfile
         # authenticate and release to CDN
-        # creds-helper init && eval $(creds-helper aws --eval aws:v1/o11y-infra/role/o11y_gdi_otel_js_web_releaser_role)
+        # - creds-helper init && eval $(creds-helper aws --eval aws:v1/o11y-infra/role/o11y_gdi_otel_js_web_releaser_role)
         - pnpm exec tsx scripts/release-cdn.mts ${CI_COMMIT_REF_NAME}
