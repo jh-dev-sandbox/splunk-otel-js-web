@@ -43,7 +43,14 @@ import { type SplunkExporterConfig } from './exporters/common'
 import { SplunkZipkinExporter } from './exporters/zipkin'
 import { ERROR_INSTRUMENTATION_NAME, SplunkErrorInstrumentation } from './SplunkErrorInstrumentation'
 import { generateId, getPluginConfig } from './utils'
-import { getRumSessionId, initSessionTracking, updateSessionStatus } from './session'
+import {
+	checkSessionRecorderType,
+	getIsNewSession,
+	getRumSessionId,
+	initSessionTracking,
+	RecorderType,
+	updateSessionStatus,
+} from './session'
 import { SplunkWebSocketInstrumentation } from './SplunkWebSocketInstrumentation'
 import { initWebVitals } from './webvitals'
 import { SplunkLongTaskInstrumentation } from './SplunkLongTaskInstrumentation'
@@ -71,6 +78,7 @@ import {
 	SplunkOtelWebConfig,
 	SplunkOtelWebExporterOptions,
 	SplunkOtelWebOptionsInstrumentations,
+	UserTrackingMode,
 } from './types'
 import { isBot } from './utils/is-bot'
 import { SplunkSamplerWrapper } from './SplunkSamplerWrapper'
@@ -164,7 +172,7 @@ export const INSTRUMENTATIONS_ALL_DISABLED: SplunkOtelWebOptionsInstrumentations
 		acc[key] = false
 		return acc
 	},
-	{ webvitals: false },
+	{ webvitals: false } as Record<string, false>,
 )
 
 function getBeaconEndpointForRealm(config: SplunkOtelWebConfigInternal) {
@@ -182,6 +190,25 @@ function buildExporter(options: SplunkOtelWebConfigInternal) {
 		otlp: options.exporter.otlp,
 		onAttributesSerializing: options.exporter.onAttributesSerializing,
 	})
+}
+
+class SessionSpanProcessor implements SpanProcessor {
+	forceFlush(): Promise<void> {
+		return Promise.resolve()
+	}
+
+	onEnd(): void {}
+
+	onStart(): void {
+		updateSessionStatus({
+			forceStore: false,
+			hadActivity: true,
+		})
+	}
+
+	shutdown(): Promise<void> {
+		return Promise.resolve()
+	}
 }
 
 export interface SplunkOtelWebType extends SplunkOtelWebEventTarget {
@@ -205,6 +232,11 @@ export interface SplunkOtelWebType extends SplunkOtelWebEventTarget {
 	_experimental_getSessionId: () => SessionId | undefined
 
 	/**
+	 * Used internally by the SplunkSessionRecorder - checks if the current session is assigned to a correct recorder type.
+	 */
+	_internalCheckSessionRecorderType: (recorderType: RecorderType) => void
+
+	/**
 	 * Allows experimental options to be passed. No versioning guarantees are given for this method.
 	 */
 	_internalInit: (options: Partial<SplunkOtelWebConfigInternal>) => void
@@ -213,6 +245,8 @@ export interface SplunkOtelWebType extends SplunkOtelWebEventTarget {
 	_internalOnExternalSpanCreated: () => void
 
 	_processedOptions: SplunkOtelWebConfigInternal | null
+
+	_processor?: SpanProcessor
 
 	attributesProcessor?: SplunkSpanAttributesProcessor
 
@@ -246,22 +280,25 @@ export interface SplunkOtelWebType extends SplunkOtelWebEventTarget {
 
 	readonly inited: boolean
 
+	isNewSessionId: () => boolean
+
 	provider?: SplunkWebTracerProvider
 
-	readonly resource?: Resource
+	resource?: Resource
 
 	setGlobalAttributes: (attributes: Attributes) => void
 
-	setUserTrackingMode: (mode: SplunkOtelWebConfig['user']['trackingMode']) => void
+	setUserTrackingMode: (mode: UserTrackingMode) => void
 }
 
 let inited = false
-let userTrackingMode: SplunkOtelWebConfig['user']['trackingMode'] = 'noTracking'
-let _deregisterInstrumentations: () => void | undefined
-let _deinitSessionTracking: () => void | undefined
+let userTrackingMode: UserTrackingMode = 'noTracking'
+let _deregisterInstrumentations: undefined | (() => void)
+let _deinitSessionTracking: undefined | (() => void)
 let _errorInstrumentation: SplunkErrorInstrumentation | undefined
 let _postDocLoadInstrumentation: SplunkPostDocLoadResourceInstrumentation | undefined
 let eventTarget: InternalEventTarget | undefined
+
 export const SplunkRum: SplunkOtelWebType = {
 	DEFAULT_AUTO_INSTRUMENTED_EVENTS,
 	DEFAULT_AUTO_INSTRUMENTED_EVENT_NAMES,
@@ -296,6 +333,7 @@ export const SplunkRum: SplunkOtelWebType = {
 
 		// "env" based config still a bad idea for web
 		if (!('OTEL_TRACES_EXPORTER' in _globalThis)) {
+			// @ts-expect-error OTEL_TRACES_EXPORTER is not defined in the global scope
 			_globalThis.OTEL_TRACES_EXPORTER = 'none'
 		}
 
@@ -340,7 +378,10 @@ export const SplunkRum: SplunkOtelWebType = {
 			},
 		)
 
-		if (!isPersistenceType(processedOptions.persistence)) {
+		if (
+			!processedOptions.persistence ||
+			(processedOptions.persistence && !isPersistenceType(processedOptions.persistence))
+		) {
 			diag.error(
 				`Invalid persistence flag: The value for "persistence" must be either "cookie", "localStorage", or omitted entirely, but was: ${processedOptions.persistence}`,
 			)
@@ -397,21 +438,57 @@ export const SplunkRum: SplunkOtelWebType = {
 
 		this.resource = new Resource(resourceAttrs)
 
+		this.attributesProcessor = new SplunkSpanAttributesProcessor(
+			{
+				...(deploymentEnvironment
+					? { 'environment': deploymentEnvironment, 'deployment.environment': deploymentEnvironment }
+					: {}),
+				...(version ? { 'app.version': version } : {}),
+				...(processedOptions.globalAttributes || {}),
+			},
+			this._processedOptions.persistence === 'localStorage',
+			() => userTrackingMode,
+			processedOptions.cookieDomain,
+		)
+
+		const spanProcessors: SpanProcessor[] = [this.attributesProcessor]
+
+		if (processedOptions.beaconEndpoint) {
+			const exporter = buildExporter(processedOptions)
+			const spanProcessor = processedOptions.spanProcessor.factory(exporter, {
+				scheduledDelayMillis: processedOptions.bufferTimeout,
+				maxExportBatchSize: processedOptions.bufferSize,
+			})
+			spanProcessors.push(spanProcessor)
+			this._processor = spanProcessor
+		}
+
+		if (processedOptions.debug) {
+			spanProcessors.push(new SimpleSpanProcessor(new ConsoleSpanExporter()))
+		}
+
+		if (options._experimental_allSpansExtendSession) {
+			spanProcessors.push(new SessionSpanProcessor())
+		}
+
+		if (options.spanProcessors) {
+			spanProcessors.push(...options.spanProcessors)
+		}
+
 		const provider = new SplunkWebTracerProvider({
 			...processedOptions.tracer,
 			resource: this.resource,
 			sampler: new SplunkSamplerWrapper({
 				decider: processedOptions.tracer?.sampler ?? new AlwaysOnSampler(),
-				allSpansAreActivity: this._processedOptions._experimental_allSpansExtendSession,
+				allSpansAreActivity: Boolean(this._processedOptions._experimental_allSpansExtendSession),
 			}),
+			spanProcessors,
 		})
 
 		_deinitSessionTracking = initSessionTracking(
 			processedOptions.persistence,
-			provider,
 			eventTarget,
 			processedOptions.cookieDomain,
-			!!options._experimental_allSpansExtendSession,
 		).deinit
 
 		const instrumentations = INSTRUMENTATIONS.map(({ Instrument, confKey, disable }) => {
@@ -437,39 +514,11 @@ export const SplunkRum: SplunkOtelWebType = {
 			return null
 		}).filter((a): a is Exclude<typeof a, null> => Boolean(a))
 
-		this.attributesProcessor = new SplunkSpanAttributesProcessor(
-			{
-				...(deploymentEnvironment
-					? { 'environment': deploymentEnvironment, 'deployment.environment': deploymentEnvironment }
-					: {}),
-				...(version ? { 'app.version': version } : {}),
-				...(processedOptions.globalAttributes || {}),
-			},
-			this._processedOptions.persistence === 'localStorage',
-			() => userTrackingMode,
-			processedOptions.cookieDomain,
-		)
-		provider.addSpanProcessor(this.attributesProcessor)
-
-		if (processedOptions.beaconEndpoint) {
-			const exporter = buildExporter(processedOptions)
-			const spanProcessor = processedOptions.spanProcessor.factory(exporter, {
-				scheduledDelayMillis: processedOptions.bufferTimeout,
-				maxExportBatchSize: processedOptions.bufferSize,
-			})
-			provider.addSpanProcessor(spanProcessor)
-			this._processor = spanProcessor
-		}
-
-		if (processedOptions.debug) {
-			provider.addSpanProcessor(new SimpleSpanProcessor(new ConsoleSpanExporter()))
-		}
-
 		window.addEventListener('visibilitychange', () => {
 			// this condition applies when the page is hidden or when it's closed
 			// see for more details: https://developers.google.com/web/updates/2018/07/page-lifecycle-api#developer-recommendations-for-each-state
 			if (document.visibilityState === 'hidden') {
-				this._processor.forceFlush()
+				void this._processor?.forceFlush()
 			}
 		})
 
@@ -509,7 +558,7 @@ export const SplunkRum: SplunkOtelWebType = {
 		_deinitSessionTracking?.()
 		_deinitSessionTracking = undefined
 
-		this.provider?.shutdown()
+		void this.provider?.shutdown()
 		delete this.provider
 
 		eventTarget = undefined
@@ -566,11 +615,15 @@ export const SplunkRum: SplunkOtelWebType = {
 		return this.removeEventListener(name, callback)
 	},
 
-	setUserTrackingMode(mode: SplunkOtelWebConfig['user']['trackingMode']) {
+	setUserTrackingMode(mode: UserTrackingMode) {
 		userTrackingMode = mode
 	},
 
 	getAnonymousId() {
+		if (!this._processedOptions) {
+			return
+		}
+
 		if (userTrackingMode === 'anonymousTracking') {
 			return getOrCreateAnonymousId({
 				useLocalStorage: this._processedOptions.persistence === 'localStorage',
@@ -586,6 +639,9 @@ export const SplunkRum: SplunkOtelWebType = {
 
 		return getRumSessionId()
 	},
+	isNewSessionId() {
+		return getIsNewSession()
+	},
 	_experimental_getSessionId() {
 		return this.getSessionId()
 	},
@@ -599,6 +655,9 @@ export const SplunkRum: SplunkOtelWebType = {
 			forceStore: false,
 			hadActivity: this._processedOptions._experimental_allSpansExtendSession,
 		})
+	},
+	_internalCheckSessionRecorderType(recorderType: RecorderType) {
+		checkSessionRecorderType(recorderType)
 	},
 }
 

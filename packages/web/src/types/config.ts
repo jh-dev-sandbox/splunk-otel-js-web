@@ -24,7 +24,7 @@ import { SplunkPostDocLoadResourceInstrumentationConfig } from '../SplunkPostDoc
 import { SocketIoClientInstrumentationConfig } from '../SplunkSocketIoClientInstrumentation'
 import { WebVitalsInstrumentationConfig } from '../webvitals'
 import { XMLHttpRequestInstrumentationConfig } from '@opentelemetry/instrumentation-xml-http-request'
-import { ReadableSpan } from '@opentelemetry/sdk-trace-base'
+import { ReadableSpan, SpanProcessor } from '@opentelemetry/sdk-trace-base'
 
 export interface SplunkOtelWebOptionsInstrumentations {
 	connectivity?: boolean | InstrumentationConfig
@@ -47,6 +47,8 @@ export interface ContextManagerConfig {
 	onBeforeContextEnd?: () => void
 	onBeforeContextStart?: () => void
 }
+
+export type UserTrackingMode = 'noTracking' | 'anonymousTracking'
 
 export interface SplunkOtelWebExporterOptions {
 	/**
@@ -172,6 +174,8 @@ export interface SplunkOtelWebConfig {
 	 */
 	rumAuth?: string
 
+	spanProcessors?: Array<SpanProcessor>
+
 	/**
 	 * Config options passed to web tracer
 	 */
@@ -179,7 +183,7 @@ export interface SplunkOtelWebConfig {
 
 	user?: {
 		/** Sets tracking mode of user. Defaults to 'noTracking'. */
-		trackingMode?: 'noTracking' | 'anonymousTracking'
+		trackingMode?: UserTrackingMode
 	}
 
 	/**

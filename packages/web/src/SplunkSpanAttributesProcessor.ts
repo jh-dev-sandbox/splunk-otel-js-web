@@ -19,7 +19,7 @@
 import { Attributes } from '@opentelemetry/api'
 import { Span, SpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { forgetAnonymousId, getOrCreateAnonymousId } from './user-tracking'
-import { SplunkOtelWebConfig } from './types/config'
+import { UserTrackingMode } from './types/config'
 import { updateSessionStatus } from './session'
 
 export class SplunkSpanAttributesProcessor implements SpanProcessor {
@@ -28,7 +28,7 @@ export class SplunkSpanAttributesProcessor implements SpanProcessor {
 	constructor(
 		globalAttributes: Attributes,
 		private useLocalStorageForSessionMetadata: boolean,
-		private getUserTracking: () => SplunkOtelWebConfig['user']['trackingMode'],
+		private getUserTracking: () => UserTrackingMode,
 		private domain?: string,
 	) {
 		this._globalAttributes = globalAttributes ?? {}
@@ -56,7 +56,7 @@ export class SplunkSpanAttributesProcessor implements SpanProcessor {
 
 		if (this.getUserTracking() === 'anonymousTracking') {
 			span.setAttribute(
-				'user.anonymousId',
+				'user.anonymous_id',
 				getOrCreateAnonymousId({
 					useLocalStorage: this.useLocalStorageForSessionMetadata,
 					domain: this.domain,
