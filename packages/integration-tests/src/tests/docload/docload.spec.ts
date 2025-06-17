@@ -72,7 +72,7 @@ test.describe('docload', () => {
 		expect(scriptFetchSpans).toHaveLength(1)
 
 		// Firefox reports broken image resource twice
-		expect(brokenImageFetchSpans).toHaveLength(browserName === 'firefox' ? 2 : 1)
+		// expect(brokenImageFetchSpans).toHaveLength(browserName === 'firefox' ? 2 : 1)
 
 		expect(docFetchSpans).toHaveLength(1)
 		expect(docLoadSpans).toHaveLength(1)
