@@ -13,7 +13,6 @@ cache:
     paths:
         - './node_modules'
         - './packages/*/node_modules'
-        - './packages/build-plugins/integration-test/node_modules'
 
 .default-setup: &pnpm-setup
     before_script:
@@ -111,7 +110,7 @@ release_npm:
             fi
 
             for f in artifacts/*.tgz; do
-              pnpm publish --dry-run $tag_flag "./$f"
+              pnpm publish --no-git-checks --dry-run $tag_flag "./$f"
             done
         - rm -f ~/.npmrc
 
